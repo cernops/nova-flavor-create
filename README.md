@@ -17,31 +17,27 @@ To see the available options run:
 
 $python cern-flavor-create -h
 
-usage: cern-flavor-create [-h] [--ephemeral EPHEMERAL] [--swap SWAP] <br />
-                          [--rxtx_factor RXTX_FACTOR] [--is_public IS_PUBLIC] <br />
-                          [--config CONFIG] <br />
-                          name id ram disk vcpus <br />
+usage: cern-flavor-create [-h] [--ephemeral EPHEMERAL] [--swap SWAP] 
+                          [--rxtx_factor RXTX_FACTOR] [--is_public IS_PUBLIC] 
+                          [--config CONFIG] 
+                          name id ram disk vcpus
 
 positional arguments:
 
-  name                  Name of the new flavor <br />
-  id                    UniqueID (integer or UUID) for the new flavor. If <br />
-                        specifying 'auto', a UUID will be generated as id <br />
-  ram                   Memory size in MB <br />
-  disk                  Disk size in GB <br />
-  vcpus                 Number of vcpus <br />
+name - Name of the new flavor <br />
+id - UniqueID (integer or UUID) for the new flavor. If specifying 'auto', a UUID will be generated as id <br />
+ram - Memory size in MB <br />
+disk - Disk size in GB <br />
+vcpus - Number of vcpus <br />
 
 optional arguments:
 
-  -h, --help            show this help message and exit <br />
-  --ephemeral EPHEMERAL <br />
-                        Ephemeral space size in GB (default 0) <br />
-  --swap SWAP           Swap space size in MB (default 0) <br />
-  --rxtx_factor RXTX_FACTOR <br />
-                        RX/TX factor (default 1) <br />
-  --is_public IS_PUBLIC <br />
-                        Make flavor accessible to the public (default False) <br />
-  --config CONFIG       Configuration file <br />
+-h, --help - show this help message and exit <br />
+--ephemeral EPHEMERAL - Ephemeral space size in GB (default 0) <br />
+--swap SWAP - Swap space size in MB (default 0) <br />
+--rxtx_factor RXTX_FACTOR - RX/TX factor (default 1) <br />
+--is_public IS_PUBLIC - Make flavor accessible to the public (default False) <br />
+--config CONFIG - Configuration file <br />
 
 
 Configuration File
