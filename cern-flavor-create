@@ -173,7 +173,7 @@ def parse_cmdline_args():
         default='False',
         help="Make flavor accessible to the public (default False)")
     parser.add_argument("--config",
-        default='cern_flavor_create.conf',
+        default='cern-flavor-create.conf',
         help='Configuration file')
     return parser.parse_args()
 
