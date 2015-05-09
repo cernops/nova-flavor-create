@@ -1,0 +1,251 @@
+#!/usr/bin/env python
+#
+# Copyright (c) 2015 CERN
+# All Rights Reserved.
+#
+#    Licensed under the Apache License, Version 2.0 (the "License"); you may
+#    not use this file except in compliance with the License. You may obtain
+#    a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+#    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+#    License for the specific language governing permissions and limitations
+#    under the License.
+#
+# Author:
+#  Belmiro Moreira <belmiro.moreira@cern.ch>
+
+
+import argparse
+import sys
+import ConfigParser
+import datetime
+import random
+import string
+
+from sqlalchemy import Table, and_, or_, func, distinct
+from sqlalchemy.orm import deferred, undefer
+from sqlalchemy import create_engine, MetaData
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.sql import func
+
+
+class NovaInstanceType:
+    def __init__(self, cell, config_file):
+        self.db = Database(cell, config_file)
+        self.instancetype_table()
+
+    def instancetype_table(self):
+        Base = self.db.Base
+        instance_types = Table('instance_types', self.db.metadata, autoload=True)
+
+        class InstanceType(Base):
+            __table__ = instance_types
+            created_at = deferred(instance_types.c.created_at)
+            updated_at = deferred(instance_types.c.updated_at)
+            deleted_at = deferred(instance_types.c.deleted_at)
+            name = deferred(instance_types.c.name)
+            id = instance_types.c.id
+            memory_mb = deferred(instance_types.c.memory_mb)
+            vcpus = deferred(instance_types.c.vcpus)
+            swap = deferred(instance_types.c.swap)
+            vcpu_weight = deferred(instance_types.c.vcpu_weight)
+            flavorid = deferred(instance_types.c.flavorid)
+            rxtx_factor = deferred(instance_types.c.rxtx_factor)
+            root_gb = deferred(instance_types.c.root_gb)
+            ephemeral_gb = deferred(instance_types.c.ephemeral_gb)
+            disabled = deferred(instance_types.c.disabled)
+            is_public = deferred(instance_types.c.is_public)
+            deleted = deferred(instance_types.c.deleted)
+
+        self.InstanceType = InstanceType
+
+    def max_instancetypeid(self):
+        rows = self.db.session.query(func.max(self.InstanceType.id).label('maximum'))
+        return rows[0].maximum
+
+    def available_flavorid(self, flavorid):
+        rows = self.db.session.query(self.InstanceType.flavorid).filter_by(flavorid=flavorid).all()
+        if len(rows) > 0:
+            return False
+        return True
+
+    def available_name(self, name):
+        rows = self.db.session.query(self.InstanceType.name).filter_by(name=name).all()
+        if len(rows) > 0:
+            return False
+        return True
+
+    def create_instancetype(self, instancetype_id, name, flavor_id, memory_mb, root_gb,
+        vcpus, ephemeral_gb=0, swap=0, rxtx_factor=1, disabled=0, is_public=0, deleted=0):
+
+        if self.db.cell_type == 'child':
+            disabled = 0
+            is_public = 1
+
+        instancetype = self.InstanceType(created_at=datetime.datetime.utcnow(),
+                                         id=instancetype_id,
+                                         name=name,
+                                         memory_mb=memory_mb,
+                                         vcpus=vcpus,
+                                         swap=swap,
+                                         flavorid=flavor_id,
+                                         rxtx_factor=rxtx_factor,
+                                         root_gb=root_gb,
+                                         ephemeral_gb=ephemeral_gb,
+                                         disabled=disabled,
+                                         is_public=is_public,
+                                         deleted=deleted)
+
+        self.db.session.add(instancetype)
+        self.db.session.commit()
+
+class Database:
+    def __init__(self, section, config_file):
+        try:
+            parser = ConfigParser.SafeConfigParser()
+            parser.read(config_file)
+            self.cell_type = parser.get(section, 'cell_type')
+            self.db_type = parser.get(section, 'db_type')
+            self.db_location = parser.get(section, 'db_location')
+            self.db_port = parser.get(section, 'db_port')
+            self.user = parser.get(section, 'user')
+            self.password = parser.get(section, 'password')
+            self.database = parser.get(section, 'database')
+            self.engine = create_engine("%s://%s:%s@%s:%s/%s" \
+                          % (self.db_type, self.user, self.password,
+                             self.db_location, self.db_port, self.database),
+                             echo=False)
+            self.engine.connect()
+            Session = sessionmaker(bind = self.engine)
+            self.session = Session()
+            self.metadata = MetaData()
+            self.metadata.bind = self.engine
+            self.Base = declarative_base()
+        except Exception as e:
+            sys.stdout.write("Wrong configuration file (%s)\n" % str(e))
+
+def available_cells(config_file):
+    try:
+        parser = ConfigParser.SafeConfigParser()
+        parser.read(config_file)
+        cells = parser.get('default', 'available_cells')
+    except Exception as e:
+        sys.stdout.write("Wrong configuration file (%s)\n" % str(e))
+    return cells
+
+def parse_cmdline_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("name",
+        type=str,
+        help="Name of the new flavor")
+    parser.add_argument("id",
+        type=str,
+        help="UniqueID (integer or UUID) for the new flavor.\
+              If specifying 'auto', a UUID will be generated as id")
+    parser.add_argument("ram",
+        type=int,
+        help="Memory size in MB")
+    parser.add_argument("disk",
+        type=int,
+        help="Disk size in GB")
+    parser.add_argument("vcpus",
+        type=int,
+        help="Number of vcpus")
+    parser.add_argument('--ephemeral',
+        type=int,
+        default=0,
+        help="Ephemeral space size in GB (default 0)")
+    parser.add_argument('--swap',
+        type=int,
+        default=0,
+        help="Swap space size in MB (default 0)")
+    parser.add_argument("--rxtx_factor",
+        type=int,
+        default=1,
+        help="RX/TX factor (default 1)")
+    parser.add_argument("--is_public",
+        type=str,
+        default='False',
+        help="Make flavor accessible to the public (default False)")
+    parser.add_argument("--config",
+        default='cloud_flavors.conf',
+        help='Configuration file')
+    return parser.parse_args()
+
+def check_consistency_id(databases):
+    return all(x.max_instancetypeid() == databases[0].max_instancetypeid() for x in databases)
+
+def check_consistency_flavorid(databases):
+    return all(x.max_flavorid() == databases[0].max_flavorid() for x in databases)
+
+def available_flavorid(flavor_id, databases):
+    return all(x.available_flavorid(flavor_id) for x in databases)
+
+def available_name(name, databases):
+    return all(x.available_name(name) for x in databases)
+
+def select_instancetypeid(databases):
+    return int(databases[0].max_instancetypeid()) + 1
+
+def generate_flavorid(databases):
+    for i in range(5):
+        flavorid = ''.join(random.choice(string.digits) for x in range(5))
+        if available_flavorid(flavorid, databases):
+            return flavorid
+    else:
+        print "ERROR - Can't generate Flavor ID."
+        sys.exit(1)
+    sys.exit(1)
+
+def main():
+    try:
+        args = parse_cmdline_args()
+    except Exception as e:
+        sys.stdout.write("Wrong command line arguments (%s)\n" % e.strerror)
+
+    cells = [cell.strip() for cell in available_cells(args.config).split(',')]
+    databases = [NovaInstanceType(cell, args.config) for cell in cells]
+
+    if not check_consistency_id(databases):
+        print "ERROR - Check databases consistency."
+        return -1
+
+    if not available_name(args.name, databases):
+        print "ERROR - Flavor name already in use."
+        return -1
+
+    if args.id == 'auto':
+        flavor_id = generate_flavorid(databases)
+    else:
+        try:
+            flavor_id = int(args.id)
+        except:
+            print "ERROR - Flavor ID is not an integer."
+            return -1
+
+        if not available_flavorid(flavor_id, databases):
+            print "ERROR - Flavor ID is not available."
+            return -1
+
+    if args.is_public in ['True', 'true']:
+        public_image = 1
+    elif args.is_public in ['False', 'false']:
+        public_image = 0
+    else:
+        print "ERROR - is_public must be 'True' or 'False'"
+
+    instancetype_id = select_instancetypeid(databases)
+
+    for db in databases:
+        db.create_instancetype(instancetype_id, args.name, flavor_id, args.ram, args.disk,
+                               args.vcpus, args.ephemeral, args.swap, args.rxtx_factor, 0,
+                               public_image, 0)
+
+
+if __name__ == '__main__':
+    sys.exit(main())
