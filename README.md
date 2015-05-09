@@ -15,12 +15,12 @@ How to use it?
 --------------
 To see the available options run:
 
-$python cern-add-flavor -h
+$python cern-flavor-create -h
 
-usage: cern-add-flavor [-h] [--ephemeral EPHEMERAL] [--swap SWAP]
-                       [--rxtx_factor RXTX_FACTOR] [--is_public IS_PUBLIC]
-                       [--config CONFIG]
-                       name id ram disk vcpus
+usage: cern-flavor-create [-h] [--ephemeral EPHEMERAL] [--swap SWAP]
+                          [--rxtx_factor RXTX_FACTOR] [--is_public IS_PUBLIC]
+                          [--config CONFIG]
+                          name id ram disk vcpus
 
 positional arguments:
   name                  Name of the new flavor
@@ -75,7 +75,7 @@ Example
 -------
 
 To create a flavor: 
-./cern-add-flavor --config my_cells_dbs.conf my_flavor auto 2048 20 2
+./cern-flavor-create --config cern-flavor-create.conf my_flavor auto 2048 20 2
 
 
 
